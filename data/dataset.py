@@ -119,9 +119,9 @@ def make_loaders(
 
     shared = dict(batch_size=batch_size, num_workers=num_workers, pin_memory=False)
 
-    train_loader = DataLoader(train_ds, shuffle=True,  **shared)
-    val_loader   = DataLoader(val_ds,   shuffle=False, **shared)
-    test_loader  = DataLoader(test_ds,  shuffle=False, **shared)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, num_workers=num_workers, pin_memory=False, shuffle=True)
+    val_loader   = DataLoader(val_ds,   batch_size=batch_size, num_workers=num_workers, pin_memory=False, shuffle=True)
+    test_loader  = DataLoader(test_ds,  batch_size=batch_size, num_workers=num_workers, pin_memory=False, shuffle=True)
 
     print(
         f"DataLoaders ready — "

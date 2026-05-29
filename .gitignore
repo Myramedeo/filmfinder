@@ -219,3 +219,6 @@ __marimo__/
 
 # Data
 data/raw/
+
+# Models
+models/checkpoints/

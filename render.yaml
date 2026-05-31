@@ -1,0 +1,34 @@
+# Render reads this file and provisions the service automatically.
+
+services:
+  - type: web
+    name: movie-recommender-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free                   
+
+    # --- Environment variables -----------------------------------------------
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+      # ALLOW_ORIGINS: comma-separated list of frontend origins that may call
+      # the API. "*" is fine for a portfolio project. In production, lock this
+      # down to your actual frontend URL.
+      - key: ALLOW_ORIGINS
+        value: "*"
+
+      # Override this if you train the model separately and store the checkpoint
+      # somewhere other than the default path inside the image.
+      # - key: MODEL_CHECKPOINT
+      #   value: /app/models/checkpoints/best_model.pt
+
+    # --- Health check ---------------------------------------------------------
+    # Render waits for /health to return 200 before routing traffic.
+    # Our lifespan hook loads the model before the server starts accepting
+    # requests, so this effectively gates on "model loaded".
+    healthCheckPath: /health
+
+    # --- Auto-deploy ----------------------------------------------------------
+    # Render re-deploys every time you push to the connected branch.
+    autoDeploy: true

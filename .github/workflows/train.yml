@@ -1,0 +1,67 @@
+# .github/workflows/train.yml
+#
+# Trains the model on GitHub Actions (free, CPU) and commits the checkpoint
+# back to the repo so every Docker build is self-contained.
+#
+# Trigger: push to main that touches data/ or models/ files.
+# You can also trigger it manually via Actions → "Run workflow".
+#
+# After the checkpoint is committed, Render picks up the push and auto-deploys.
+
+name: Train & commit checkpoint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/**"
+      - "models/**"
+      - "requirements.txt"
+  workflow_dispatch:   # manual trigger
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies (CPU torch)
+        run: |
+          pip install torch==2.2.0+cpu \
+            -f https://download.pytorch.org/whl/torch_stable.html
+          pip install -r requirements.txt
+
+      - name: Download MovieLens 100K
+        run: python -m data.download
+
+      - name: Train model
+        run: |
+          python -m models.train \
+            --epochs 15 \
+            --batch-size 1024 \
+            --output-dim 64 \
+            --patience 4 \
+            --device cpu
+
+      - name: Show results
+        run: cat models/checkpoints/results.json
+
+      - name: Commit checkpoint
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add models/checkpoints/best_model.pt models/checkpoints/results.json
+          git diff --cached --quiet \
+            || git commit -m "ci: retrain checkpoint [skip ci]"
+          git push

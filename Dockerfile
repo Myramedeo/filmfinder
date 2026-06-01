@@ -22,6 +22,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY . .
 
+RUN python -m data.download
+RUN ls -R /app/data/raw
+
 ENV PORT=8000
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1

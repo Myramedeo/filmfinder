@@ -3,8 +3,7 @@ title: Filmfinder — Neural Movie Recommender
 emoji: 🎬
 colorFrom: yellow
 colorTo: orange
-sdk: streamlit
-sdk_version: "1.35.0"
+sdk: docker
 app_file: app.py
 pinned: false
 license: mit

@@ -39,8 +39,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from data.preprocess import build_dataset
 from data.dataset import make_loaders
-from two_tower import TwoTowerModel, build_model
-from evaluate import compute_auc, ranking_metrics
+from models.two_tower import TwoTowerModel, build_model
+from models.evaluate import compute_auc, ranking_metrics
 
 CHECKPOINT_DIR = Path(__file__).parent / "checkpoints"
 

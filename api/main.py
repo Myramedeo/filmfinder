@@ -29,7 +29,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from schemas import (
+from api.schemas import (
     HealthResponse,
     MovieDetailResponse,
     MovieOut,
@@ -37,7 +37,7 @@ from schemas import (
     RecommendResponse,
     SimilarResponse,
 )
-from model_store import store, ScoredItem
+from api.model_store import store, ScoredItem
 
 
 # ---------------------------------------------------------------------------

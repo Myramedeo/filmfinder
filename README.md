@@ -2,7 +2,7 @@
 
 A production-style movie recommendation system built with PyTorch, FastAPI, and Streamlit. Trained on MovieLens 100K using a two-tower neural architecture, the same retrieval pattern used at YouTube, Pinterest, and Spotify.
 
-**[Live Demo](https://myramedeo.github.io/filmfinder/)** · **[API Docs](https://filmfinder-xv5p.onrender.com/docs)**
+**[Live Demo](https://huggingface.co/spaces/Myramedeo/filmfinder)** · **[GitHub Pages (Mirror)](https://myramedeo.github.io/filmfinder/)** · **[API Docs](https://filmfinder-xv5p.onrender.com/docs)**
 
 ---
 

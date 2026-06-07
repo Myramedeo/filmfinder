@@ -14,24 +14,35 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-MOVIELENS_URL = "https://files.grouplens.org/datasets/movielens/ml-100k.zip"
+MOVIELENS_URLS = {
+    "ml-100k": "https://files.grouplens.org/datasets/movielens/ml-100k.zip",
+    "ml-25m":  "https://files.grouplens.org/datasets/movielens/ml-25m.zip",
+}
 DEFAULT_DEST = Path(__file__).parent / "raw"
 
 
-def download_movielens(dest: Path = DEFAULT_DEST, force: bool = False) -> Path:
-    """Download and extract MovieLens 100K. Returns path to extracted folder."""
+def download_movielens(
+    dest: Path = DEFAULT_DEST,
+    force: bool = False,
+    dataset_name: str = "ml-100k",
+) -> Path:
+    """Download and extract a MovieLens dataset. Returns path to extracted folder."""
+    if dataset_name not in MOVIELENS_URLS:
+        raise ValueError(f"Unsupported dataset_name '{dataset_name}'. Choose from: {sorted(MOVIELENS_URLS)}")
+
     dest = Path(dest)
-    extracted = dest / "ml-100k"
+    extracted = dest / dataset_name
+    url = MOVIELENS_URLS[dataset_name]
 
     if extracted.exists() and not force:
         print(f"[skip] Already exists at {extracted}. Pass --force to re-download.")
         return extracted
 
     dest.mkdir(parents=True, exist_ok=True)
-    print(f"Downloading MovieLens 100K from {MOVIELENS_URL} …")
+    print(f"Downloading {dataset_name.upper()} from {url} …")
 
     req = urllib.request.Request(
-        MOVIELENS_URL,
+        url,
         headers={"User-Agent": "Mozilla/5.0 (compatible; movie-recommender-project)"},
     )
     with urllib.request.urlopen(req) as resp:
@@ -48,5 +59,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dest", default=str(DEFAULT_DEST))
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--dataset", default="ml-100k", choices=sorted(MOVIELENS_URLS))
     args = parser.parse_args()
-    download_movielens(Path(args.dest), force=args.force)
+    download_movielens(Path(args.dest), force=args.force, dataset_name=args.dataset)

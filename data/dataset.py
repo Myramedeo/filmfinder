@@ -45,8 +45,9 @@ class MovieLensDataset(Dataset):
         n_users = users["user_idx"].max() + 1
 
         # Item feature arrays  (shape: n_items × *)
-        genre_mat   = np.zeros((n_items, 19), dtype=np.float32)
-        year_arr    = np.zeros(n_items, dtype=np.float32)
+        genre_dim = len(movies.iloc[0]["genre_vec"]) if len(movies) else 19
+        genre_mat = np.zeros((n_items, genre_dim), dtype=np.float32)
+        year_arr  = np.zeros(n_items, dtype=np.float32)
 
         for _, row in movies.iterrows():
             idx = int(row["item_idx"])

@@ -189,7 +189,7 @@ def train(
         item_features=ds["movies"],
         device=device,
         k_values=k_values,
-        max_users=200,
+        max_users=None,  # set to e.g. 200 for a quick smoke test; None for full eval
     )
 
     test_auc = compute_auc(model, test_loader, device)

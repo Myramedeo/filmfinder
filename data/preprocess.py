@@ -29,12 +29,26 @@ import pandas as pd
 RAW_DIR = Path(__file__).parent / "raw" / "ml-100k"
 
 # MovieLens 100K genre columns (order matches the u.item bitmask)
-GENRES = [
+DEFAULT_GENRES = [
     "unknown", "Action", "Adventure", "Animation", "Children",
     "Comedy", "Crime", "Documentary", "Drama", "Fantasy",
     "Film-Noir", "Horror", "Musical", "Mystery", "Romance",
     "Sci-Fi", "Thriller", "War", "Western",
 ]
+GENRES = DEFAULT_GENRES.copy()
+
+
+def _genre_vocab_from_movies(movies_df: pd.DataFrame) -> list[str]:
+    """Infer the genre vocabulary from the raw movie metadata."""
+    raw_genres = movies_df["genres"].astype(str).fillna("").str.split("|")
+    unique = sorted({genre for row in raw_genres for genre in row if genre})
+    return unique or DEFAULT_GENRES.copy()
+
+
+def _build_genre_vector(genres: str, vocab: list[str]) -> np.ndarray:
+    """Create a multi-hot genre vector for either 100K or 25M-style metadata."""
+    present = set(genres.split("|")) if isinstance(genres, str) else set()
+    return np.asarray([1.0 if genre in present else 0.0 for genre in vocab], dtype=np.float32)
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +56,17 @@ GENRES = [
 # ---------------------------------------------------------------------------
 
 def load_ratings(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
-    """Load u.data → (user_id, item_id, rating, timestamp)."""
+    """Load ratings from either 100K or 25M-style raw data."""
+    ratings_csv = raw_dir / "ratings.csv"
+    if ratings_csv.exists():
+        df = pd.read_csv(
+            ratings_csv,
+            usecols=["userId", "movieId", "rating", "timestamp"],
+            dtype={"userId": int, "movieId": int, "rating": float, "timestamp": int},
+        )
+        df = df.rename(columns={"userId": "user_id", "movieId": "item_id"})
+        return df.sort_values("timestamp").reset_index(drop=True)
+
     df = pd.read_csv(
         raw_dir / "u.data",
         sep="\t",
@@ -53,19 +77,43 @@ def load_ratings(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
 
 
 def load_movies(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
-    """
-    Load u.item → (item_id, title, year, genre_vec).
+    """Load movies from either 100K or 25M-style raw data."""
+    global GENRES
 
-    genre_vec is a float32 numpy array of shape (19,), one-hot over GENRES.
-    """
-    cols = ["item_id", "title", "release_date", "video_date", "imdb_url"] + GENRES
+    movies_csv = raw_dir / "movies.csv"
+    if movies_csv.exists():
+        df = pd.read_csv(
+            movies_csv,
+            usecols=["movieId", "title", "genres"],
+            dtype={"movieId": int},
+        )
+        df = df.rename(columns={"movieId": "item_id"})
+        genre_vocab = _genre_vocab_from_movies(df)
+        GENRES = genre_vocab.copy()
+
+        df["year"] = (
+            df["title"]
+            .str.extract(r"\((\d{4})\)")
+            .astype(float)
+            .fillna(0)
+            .astype(int)
+        )
+        y_min, y_max = df["year"].replace(0, np.nan).min(), df["year"].max()
+        df["year_norm"] = ((df["year"] - y_min) / (y_max - y_min + 1e-8)).fillna(0.0)
+        df["genre_vec"] = [
+            _build_genre_vector(row["genres"], GENRES).tolist() for _, row in df.iterrows()
+        ]
+        return df[["item_id", "title", "year", "year_norm", "genre_vec"]]
+
+    cols = ["item_id", "title", "release_date", "video_date", "imdb_url"] + DEFAULT_GENRES
     df = pd.read_csv(
         raw_dir / "u.item",
         sep="|",
         names=cols,
         encoding="latin-1",
-        usecols=["item_id", "title", "release_date"] + GENRES,
+        usecols=["item_id", "title", "release_date"] + DEFAULT_GENRES,
     )
+    GENRES = DEFAULT_GENRES.copy()
 
     # Extract 4-digit year from title string, e.g. "Toy Story (1995)" → 1995
     df["year"] = (
@@ -87,25 +135,32 @@ def load_movies(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
     return df[["item_id", "title", "year", "year_norm", "genre_vec"]]
 
 
-def load_users(raw_dir: Path = RAW_DIR) -> pd.DataFrame:
-    """Load u.user → (user_id, age, gender_m, occupation)."""
-    occ_map = {o: i for i, o in enumerate([
-        "administrator", "artist", "doctor", "educator", "engineer",
-        "entertainment", "executive", "healthcare", "homemaker", "lawyer",
-        "librarian", "marketing", "none", "other", "programmer",
-        "retired", "salesman", "scientist", "student", "technician", "writer",
-    ])}
-    df = pd.read_csv(
-        raw_dir / "u.user",
-        sep="|",
-        names=["user_id", "age", "gender", "occupation", "zip"],
-        usecols=["user_id", "age", "gender", "occupation"],
-    )
-    df["gender_m"] = (df["gender"] == "M").astype(np.float32)
-    df["occ_idx"] = df["occupation"].map(occ_map).fillna(12).astype(int)  # 12 = "none"
-    age_min, age_max = df["age"].min(), df["age"].max()
-    df["age_norm"] = ((df["age"] - age_min) / (age_max - age_min + 1e-8)).astype(np.float32)
-    return df[["user_id", "age_norm", "gender_m", "occ_idx"]]
+def load_users(raw_dir: Path = RAW_DIR, ratings: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Load user metadata or synthesize defaults for 25M-style datasets."""
+    users_csv = raw_dir / "users.csv"
+    if users_csv.exists():
+        df = pd.read_csv(users_csv, usecols=["userId", "age", "gender", "occupation"])
+        df = df.rename(columns={"userId": "user_id"})
+        df["gender_m"] = (df["gender"] == "M").astype(np.float32)
+        occ_map = {o: i for i, o in enumerate([
+            "administrator", "artist", "doctor", "educator", "engineer",
+            "entertainment", "executive", "healthcare", "homemaker", "lawyer",
+            "librarian", "marketing", "none", "other", "programmer",
+            "retired", "salesman", "scientist", "student", "technician", "writer",
+        ])}
+        df["occ_idx"] = df["occupation"].map(occ_map).fillna(12).astype(int)
+        age_min, age_max = df["age"].min(), df["age"].max()
+        df["age_norm"] = ((df["age"] - age_min) / (age_max - age_min + 1e-8)).astype(np.float32)
+        return df[["user_id", "age_norm", "gender_m", "occ_idx"]]
+
+    if ratings is None:
+        ratings = load_ratings(raw_dir)
+
+    users = pd.DataFrame({"user_id": sorted(ratings["user_id"].unique())})
+    users["age_norm"] = 0.5
+    users["gender_m"] = 0.5
+    users["occ_idx"] = 0
+    return users
 
 
 # ---------------------------------------------------------------------------
@@ -204,7 +259,7 @@ def build_dataset(
     print("Loading raw data …")
     ratings = load_ratings(raw_dir)
     movies  = load_movies(raw_dir)
-    users   = load_users(raw_dir)
+    users   = load_users(raw_dir, ratings=ratings)
 
     print("Building ID maps …")
     user2idx, idx2user, item2idx, idx2item = build_id_maps(ratings)
